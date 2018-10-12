@@ -15,30 +15,40 @@ class ActionLayer(BaseActionLayer):
         --------
         layers.ActionNode
         """
-        # TODO: implement this function
-        raise NotImplementedError
+        for eff_a in actionA.effects:
+            if ~eff_a in actionB.effects:
+                return True
+        return False;
 
 
     def _interference(self, actionA, actionB):
-        """ Return True if the effects of either action negate the preconditions of the other 
-        
+        """ Return True if the effects of either action negate the preconditions of the other
+
         See Also
         --------
         layers.ActionNode
         """
-        # TODO: implement this function
-        raise NotImplementedError
+        for eff in actionA.effects:
+            if ~eff in actionB.preconditions:
+                return True
+        for eff in actionB.effects:
+            if ~eff in actionA.preconditions:
+                return True
+        return False
 
     def _competing_needs(self, actionA, actionB):
         """ Return True if any preconditions of the two actions are pairwise mutex in the parent layer
-        
+
         See Also
         --------
         layers.ActionNode
         layers.BaseLayer.parent_layer
         """
-        # TODO: implement this function
-        raise NotImplementedError
+        for pre_a in actionA.preconditions:
+            for pre_b in actionB.preconditions:
+                if self.parent_layer.is_mutex(pre_a, pre_b):
+                    return True
+        return False
 
 
 class LiteralLayer(BaseLiteralLayer):
@@ -50,13 +60,17 @@ class LiteralLayer(BaseLiteralLayer):
         --------
         layers.BaseLayer.parent_layer
         """
-        # TODO: implement this function
-        raise NotImplementedError
+        actions2A = self.parents[literalA]
+        actions2B = self.parents[literalB]
+        for act_a in actions2A:
+            for act_b in actions2B:
+                if not self.parent_layer.is_mutex(act_a, act_b):
+                    return False
+        return True
 
     def _negation(self, literalA, literalB):
         """ Return True if two literals are negations of each other """
-        # TODO: implement this function
-        raise NotImplementedError
+        return literalA==(~literalB)
 
 
 class PlanningGraph:
@@ -85,7 +99,7 @@ class PlanningGraph:
         # make no-op actions that persist every literal to the next layer
         no_ops = [make_node(n, no_op=True) for n in chain(*(makeNoOp(s) for s in problem.state_map))]
         self._actionNodes = no_ops + [make_node(a) for a in problem.actions_list]
-        
+
         # initialize the planning graph by finding the literals that are in the
         # first layer and finding the actions they they should be connected to
         literals = [s if f else ~s for f, s in zip(state, problem.state_map)]
@@ -102,7 +116,7 @@ class PlanningGraph:
         level at which the literal first appears in the planning graph. Note
         that the level cost is **NOT** the minimum number of actions to
         achieve a single goal literal.
-        
+
         For example, if Goal_1 first appears in level 0 of the graph (i.e.,
         it is satisfied at the root of the planning graph) and Goal_2 first
         appears in level 3, then the levelsum is 0 + 3 = 3.
@@ -119,8 +133,23 @@ class PlanningGraph:
         --------
         Russell-Norvig 10.3.1 (3rd Edition)
         """
-        # TODO: implement this function
-        raise NotImplementedError
+        temp_goal = set(x for x in self.goal)
+        score = 0;
+        level = 0;
+        while (not self._is_leveled):
+            remove_goal = set()
+            for x in temp_goal:
+                if x in self.literal_layers[-1]:
+                    score += level
+                    remove_goal.add(x)
+            temp_goal -= remove_goal
+            if(0==len(temp_goal)):
+                return score
+
+            self._extend()
+            level += 1
+        import math
+        return math.inf
 
     def h_maxlevel(self):
         """ Calculate the max level heuristic for the planning graph
@@ -149,8 +178,23 @@ class PlanningGraph:
         -----
         WARNING: you should expect long runtimes using this heuristic with A*
         """
-        # TODO: implement maxlevel heuristic
-        raise NotImplementedError
+        temp_goal = set(x for x in self.goal)
+        score = 0;
+        level = 0;
+        while (not self._is_leveled):
+            remove_goal = set()
+            for x in temp_goal:
+                if x in self.literal_layers[-1]:
+                    score = level
+                    remove_goal.add(x)
+            temp_goal -= remove_goal
+            if(0==len(temp_goal)):
+                return score
+
+            self._extend()
+            level += 1
+        import math
+        return math.inf
 
     def h_setlevel(self):
         """ Calculate the set level heuristic for the planning graph
@@ -174,8 +218,22 @@ class PlanningGraph:
         -----
         WARNING: you should expect long runtimes using this heuristic on complex problems
         """
-        # TODO: implement setlevel heuristic
-        raise NotImplementedError
+        from itertools import combinations
+        level = 0;
+        while (not self._is_leveled):
+            if self.goal <= set(self.literal_layers[-1]):
+                isMet = True
+                for literalA, literalB in combinations(iter(self.goal), 2):
+                    if self.literal_layers[-1].is_mutex(literalA, literalB):
+                        isMet = False
+                        break
+                if isMet:
+                    return level
+
+            self._extend()
+            level += 1
+        import math
+        return math.inf
 
     ##############################################################################
     #                     DO NOT MODIFY CODE BELOW THIS LINE                     #
@@ -208,7 +266,7 @@ class PlanningGraph:
         negative literals in the leaf nodes of the parent literal level.
 
         The new literal layer contains all literals that could result from taking each possible
-        action in the NEW action layer. 
+        action in the NEW action layer.
         """
         if self._is_leveled: return
 
