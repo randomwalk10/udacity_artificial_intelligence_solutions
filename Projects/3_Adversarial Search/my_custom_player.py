@@ -52,7 +52,7 @@ class CustomPlayer(DataPlayer):
         # self.queue.put(random.choice(state.actions()))
 
         # initialize and load data.pickle
-        NUM_ROUNDS = 10
+        NUM_ROUNDS = 100
         if not self.data:
             self.data = defaultdict(Counter)
 
@@ -63,14 +63,13 @@ class CustomPlayer(DataPlayer):
         # return an action of current state with the highest reward
         self.queue.put(max(self.data[state], key=self.data[state].get))
 
-    def __del__(self):
-        if self.data:
-            filename = "data.pickle"
-            f = open(filename, 'wb')
-            pickle.dump(self.data, f)
-            f.close()
+        # save data
+        filename = "data.pickle"
+        f = open(filename, 'wb')
+        pickle.dump(self.data, f)
+        f.close()
 
-    def build_tree(self, state, depth=4):
+    def build_tree(self, state, depth=8):
         """randomly choose an action from current state, until the game
         terminates or reaches the maximum depth level, and update this action
         at this state with the estimated reward, calculated by function
